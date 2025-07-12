@@ -1,3 +1,6 @@
+from random import sample
+
+
 class Buffer:
     def __init__(self, size):
         self.buffer = []
@@ -17,5 +20,9 @@ class Buffer:
             return True
         return False
     
+    def sample(self, n):
+        # if there are enough experiences
+        return sample(self.buffer, n)
+        
     def get(self):
         return self.buffer
