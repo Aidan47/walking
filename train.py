@@ -1,24 +1,28 @@
 import torch
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
+import gymnasium as gym
 import numpy as np
-from models import Actor, Critic
+from models import Actor, Critic, expand
 from buffer import Buffer
 
 
 
 def Initialize():
-    return Actor, Critic, Buffer
+    env = gym.make("Humanoid-v4")
+    return Actor(), Critic(), Critic(), Buffer(size=1000000), env
     
 
-def updatable():
-    pass
+def updatable(step, start=10000):
+    if step > start:
+        return True
+    return False
 
 
-def update(buffer, n, exs):
+def update(actor, critic1, critic2, buffer, n, batchSize):
     for _ in range(n):
         # randomly sample buffer
-        batch = buffer.sample(exs)
+        batch = buffer.sample(batchSize)
         
         '''
         compute targets for Q functions
@@ -29,31 +33,31 @@ def update(buffer, n, exs):
     pass
 
 
-def main(converging=True):
+def learn(steps=3000000, batchSize=256, numOfUpdates=1):
+    actor, critic1, critic2, buffer, env = Initialize()
+    target1, target2 = critic1, critic2     # target networks
     
-    model1, model2, buffer = Initialize()
-    
-    # Initialize Enviornment
-    
-    while converging:
-        # select Action a for State s w/ Actor model
+    for step in range(steps):
+        (state, _), truncated, terminal = env.reset(), False, False         # Initialize/Reset Enviornment
         
-        # take action in the enviornment
-        
-        if not terminal:
-            # store old state, action, reward, new state, and new state terminality
-            buffer.add("(s, a, r, s', t)")
-        else:
-            # reset enviornment
+        while not terminal and not truncated:
+            mean, std = expand(actor.forward(torch.from_numpy(state)))      # type: ignore # select Action a for State s w/ Actor model
+            action = torch.normal(mean, std)                                # take action in the enviornment
             
-        if updatable():
-            update(numOfUpdates)
+            state, reward, newState, truncated, terminal = env.step(action.detach().numpy())
             
+            if not terminal:
+                buffer.add((state, action, reward, newState))   # store replay in buffer
+                state = newState
+                
+            if updatable(step):
+                update(actor, critic1, critic2, buffer, numOfUpdates, batchSize)
             
     # Save trained models
-    
+    torch.save(actor.state_dict(), 'actor_weights.pth')
+    torch.save(target1.state_dict(), 'critic_weights.pth')
     return
 
 
 if __name__ == "__main__":
-    pass
+    learn()
