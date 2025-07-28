@@ -1,3 +1,4 @@
+import torch
 from random import sample
 
 
@@ -7,18 +8,11 @@ class Buffer:
         self.size   = size
     
     def add(self, experience):
-        if not Buffer.isValid(experience):
-            return
-        
         if len(self.buffer) >= self.size:
             self.buffer.pop(0)
-            
+        # convert all ndarrays to tensors
+        experience = [torch.from_numpy(ele) for i, ele in enumerate(experience) if i != 2]
         self.buffer.append(experience)
-    
-    def isValid(experience):
-        if experience[3] is "terminated":
-            return True
-        return False
     
     def sample(self, n):
         # if there are enough experiences
