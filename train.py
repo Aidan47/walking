@@ -35,6 +35,10 @@ def sample(mean:torch.Tensor, log_std:torch.Tensor, with_entropy:bool, scale=0.4
     return a, logP
 
 
+def saveable(step, save=50000):
+    return step % save == 0
+
+
 def updatable(step, start=10000):
     if step > start:
         return True
@@ -49,8 +53,9 @@ def soft_update(Q, T, p):
 
 
 @torch.no_grad()
-def evaluate(env, actor, episodes=3):
+def evaluate(env, actor, episodes=10):
     AVG_reward = 0
+    AVG_duration = 0
     for episode in range(episodes):
         (state, _), truncated, terminal = env.reset(), False, False
         while not terminal or truncated:
@@ -59,10 +64,11 @@ def evaluate(env, actor, episodes=3):
             newState, reward, terminal, truncated, _ = env.step(action.detach().numpy())
             state = newState
             AVG_reward += (1/episodes) * reward    # distrubutivity shows <- == (∑ reward_per_episode) / episodes
-    return AVG_reward
+            AVG_duration += (1/episodes)
+    return AVG_reward, AVG_duration
 
 
-def learn(steps=10000000, lr=3e-4, reward_scale=20, temperature=0.2, batchSize=256, numOfUpdates=1, target_smoothing=0.005, discount=0.99):
+def learn(steps=1000000, lr=3e-4, reward_scale=20, temperature=0.2, batchSize=256, numOfUpdates=1, target_smoothing=0.005, discount=0.99):
     actor, critic1, critic2, optimAct, optimQ, buffer, env = Initialize(lr)
     target1, target2 = deepcopy(critic1), deepcopy(critic2)                     # target networks
     rewards = np.ndarray([])
@@ -83,9 +89,20 @@ def learn(steps=10000000, lr=3e-4, reward_scale=20, temperature=0.2, batchSize=2
             state = newState
             
             # measure progress
-            if step % 1000 == 0:
-                rewards = np.append(rewards, evaluate(env, actor))
-                print(f"episode: {step}; AVG Reward: {rewards[-1]:.4f}")
+            if step % 10000 == 0:
+                avg_rewards, avg_duration = evaluate(env, actor)
+                rewards = np.append(rewards, avg_rewards)
+                print(f"episode: {step}; AVG Reward: {rewards[-1]:.3f}, AVG Duration: {avg_duration:.3f}")
+            
+            if saveable(step):
+                save(
+                    actor=actor,
+                    critic1=critic1,
+                    target1=target1,
+                    critic2=critic2,
+                    target2=target2
+                )
+                np.save("rewards", rewards, True)
             
             if updatable(buffer.ptr):
                 # randomly sample buffer
@@ -139,7 +156,7 @@ def learn(steps=10000000, lr=3e-4, reward_scale=20, temperature=0.2, batchSize=2
     )
     
     # Save rewards
-    np.save("rewards", rewards, True)
+    np.save("checkpoints/rewards.npy", rewards, True)
 
 
 if __name__ == "__main__":
