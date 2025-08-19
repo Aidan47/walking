@@ -6,13 +6,13 @@ import numpy as np
 
 
 class Actor(nn.Module):
-    def __init__(self):
+    def __init__(self, input:int, output:int):
         super(Actor, self).__init__()
         
-        self.l1 = nn.Linear(376, 256, dtype=torch.float32)
+        self.l1 = nn.Linear(input, 256, dtype=torch.float32)
         self.l2 = nn.Linear(256, 256, dtype=torch.float32)
         self.mu = nn.Linear(256, 17, dtype=torch.float32)
-        self.log_std = nn.Linear(256, 17, dtype=torch.float32)
+        self.log_std = nn.Linear(256, output, dtype=torch.float32)
     
     def forward(self, s:torch.Tensor):
         x = F.relu(self.l1(s))
@@ -23,10 +23,10 @@ class Actor(nn.Module):
         
 
 class Critic(nn.Module):
-    def __init__(self):
+    def __init__(self, input:int):
         super(Critic, self).__init__()
         
-        self.l1 = nn.Linear(393, 256, dtype=torch.float32)
+        self.l1 = nn.Linear(input, 256, dtype=torch.float32)
         self.l2 = nn.Linear(256, 256, dtype=torch.float32)
         self.l3 = nn.Linear(256, 1, dtype=torch.float32)
         

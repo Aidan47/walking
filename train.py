@@ -13,12 +13,13 @@ import itertools
 
 def Initialize(lr):
     env = gym.make("Humanoid-v4")
-    a, c1, c2 = Actor(), Critic(), Critic(),
+    sDim, aDim = env.observation_space.shape[0], env.action_space.shape[0] # type: ignore
+    a, c1, c2 = Actor(sDim, aDim), Critic(sDim+aDim), Critic(sDim+aDim),
     optimAct = torch.optim.Adam(a.parameters(), lr=lr)
     optimQ = torch.optim.Adam(list(c1.parameters()) + list(c2.parameters()), lr=lr)
     log_temp = torch.zeros(1, requires_grad=True)
     optimTemp = torch.optim.Adam([log_temp], lr=lr)
-    return a, c1, c2, log_temp, optimAct, optimQ, optimTemp, Buffer(sDim=env.observation_space.shape[0], aDim=env.action_space.shape[0], size=1000000), env # type: ignore
+    return a, c1, c2, log_temp, optimAct, optimQ, optimTemp, Buffer(sDim, aDim, size=1000000), env # type: ignore
     
 
 def sample(mean:torch.Tensor, log_std:torch.Tensor, with_entropy:bool, scale=0.4):
