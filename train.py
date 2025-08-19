@@ -57,18 +57,21 @@ def soft_update(Q, T, p):
 
 @torch.no_grad()
 def evaluate(env, actor, episodes=10):
-    AVG_reward = 0
-    AVG_duration = 0
+    total_rewards = []
+    total_durations = []
     for episode in range(episodes):
         (state, _), truncated, terminal = env.reset(), False, False
+        rewards = steps = 0
         while not (terminal or truncated):
             with torch.no_grad():
                 action, _ = actor.forward(torch.from_numpy(state).float())
             newState, reward, terminal, truncated, _ = env.step(action.detach().numpy())
             state = newState
-            AVG_reward += (1/episodes) * reward    # distrubutivity shows <- == (∑ reward_per_episode) / episodes
-            AVG_duration += (1/episodes)
-    return AVG_reward, AVG_duration
+            rewards += reward
+            steps += 1
+        total_rewards.append(rewards)
+        total_durations.append(steps)
+    return np.average(total_rewards), np.average(total_durations)
 
 
 def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSize=256, numOfUpdates=1, target_smoothing=0.005, discount=0.99):
@@ -109,7 +112,7 @@ def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSi
                     critic2=critic2,
                     target2=target2
                 )
-                np.save(f"checkpoints/{Env}/rewards_{step//1000}k", rewards, True)
+            np.save(f"checkpoints/{Env}/rewards_{step}k", rewards, True)
             
             if updatable(buffer.ptr):
                 # randomly sample buffer
