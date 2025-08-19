@@ -78,7 +78,7 @@ def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSi
     actor, critic1, critic2, log_temp, optimAct, optimQ, optimTemp, buffer, env = Initialize(Env, lr)
     target1, target2 = deepcopy(critic1), deepcopy(critic2)     # target networks
     temperature = log_temp.exp()
-    rewards = np.ndarray([])
+    Avg_Rewards = list()
     
     step = 0
     while step < steps:
@@ -91,16 +91,17 @@ def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSi
             (action, _) = sample(mean, log_std, False)                              # take action in the enviornment
 
             newState, reward, terminal, truncated, info = env.step(action.detach().numpy())
-            step += 1
             done = terminal or truncated
             buffer.add(torch.from_numpy(state).detach(), action.detach(), reward, torch.from_numpy(newState).detach(), done) # store replay in buffer
             state = newState
+
+            step += 1  # 1 enviornment step
             
             # measure progress
             if step % 10000 == 0:
-                avg_rewards, avg_duration = evaluate(env, actor)
-                rewards = np.append(rewards, avg_rewards)
-                print(f"episode: {step//1000}k; AVG Reward: {rewards[-1]:.3f}, AVG Duration: {int(avg_duration)}")
+                avg_reward, avg_duration = evaluate(env, actor)
+                Avg_Rewards.append(avg_reward)
+                print(f"episode: {step//1000}k; AVG Reward: {Avg_Rewards[-1]:.3f}, AVG Duration: {int(avg_duration)}")
             
             if saveable(step):
                 save(
@@ -112,7 +113,7 @@ def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSi
                     critic2=critic2,
                     target2=target2
                 )
-            np.save(f"checkpoints/{Env}/rewards_{step}k", rewards, True)
+                np.save(f"checkpoints/{Env}/rewards_{step//1000}k", Avg_Rewards, True)
             
             if updatable(buffer.ptr):
                 # randomly sample buffer
@@ -174,7 +175,7 @@ def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSi
     )
     
     # Save rewards
-    np.save(f"checkpoints/{Env}/rewards.npy", rewards, True)
+    np.save(f"checkpoints/{Env}/rewards.npy", Avg_Rewards, True)
 
 
 if __name__ == "__main__":
