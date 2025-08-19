@@ -11,7 +11,7 @@ class Actor(nn.Module):
         
         self.l1 = nn.Linear(input, 256, dtype=torch.float32)
         self.l2 = nn.Linear(256, 256, dtype=torch.float32)
-        self.mu = nn.Linear(256, 17, dtype=torch.float32)
+        self.mu = nn.Linear(256, output, dtype=torch.float32)
         self.log_std = nn.Linear(256, output, dtype=torch.float32)
     
     def forward(self, s:torch.Tensor):
@@ -38,5 +38,13 @@ class Critic(nn.Module):
     
     
 def save(**kwargs):
-    for key, value in kwargs.items():
-        torch.save(value.state_dict(), f"checkpoints/{key}.pth")    # save each model
+    env = kwargs.pop("env", None)
+    step = kwargs.pop("step", None)
+    
+    # save each model
+    if step != None:
+        for key, value in kwargs.items():
+            torch.save(value.state_dict(), f"checkpoints/{env}/{key}_{step}k.pth")
+    else:
+        for key, value in kwargs.items():
+            torch.save(value.state_dict(), f"checkpoints/{env}/{key}.pth")
