@@ -16,7 +16,9 @@ def Initialize(lr):
     a, c1, c2 = Actor(), Critic(), Critic(),
     optimAct = torch.optim.Adam(a.parameters(), lr=lr)
     optimQ = torch.optim.Adam(list(c1.parameters()) + list(c2.parameters()), lr=lr)
-    return a, c1, c2, optimAct, optimQ, Buffer(sDim=env.observation_space.shape[0], aDim=env.action_space.shape[0], size=1000000), env # type: ignore
+    log_temp = torch.zeros(1, requires_grad=True)
+    optimTemp = torch.optim.Adam([log_temp], lr=lr)
+    return a, c1, c2, log_temp, optimAct, optimQ, optimTemp, Buffer(sDim=env.observation_space.shape[0], aDim=env.action_space.shape[0], size=1000000), env # type: ignore
     
 
 def sample(mean:torch.Tensor, log_std:torch.Tensor, with_entropy:bool, scale=0.4):
@@ -58,7 +60,7 @@ def evaluate(env, actor, episodes=10):
     AVG_duration = 0
     for episode in range(episodes):
         (state, _), truncated, terminal = env.reset(), False, False
-        while not terminal or truncated:
+        while not (terminal or truncated):
             with torch.no_grad():
                 action, _ = actor.forward(torch.from_numpy(state).float())
             newState, reward, terminal, truncated, _ = env.step(action.detach().numpy())
@@ -68,19 +70,21 @@ def evaluate(env, actor, episodes=10):
     return AVG_reward, AVG_duration
 
 
-def learn(steps=1000000, lr=3e-4, reward_scale=20, temperature=0.2, batchSize=256, numOfUpdates=1, target_smoothing=0.005, discount=0.99):
-    actor, critic1, critic2, optimAct, optimQ, buffer, env = Initialize(lr)
-    target1, target2 = deepcopy(critic1), deepcopy(critic2)                     # target networks
+def learn(steps=1000000, lr=3e-4, entropy_target=-17, batchSize=256, numOfUpdates=1, target_smoothing=0.005, discount=0.99):
+    actor, critic1, critic2, log_temp, optimAct, optimQ, optimTemp, buffer, env = Initialize(lr)
+    target1, target2 = deepcopy(critic1), deepcopy(critic2)     # target networks
+    temperature = log_temp.exp()
     rewards = np.ndarray([])
     
     step = 0
     while step < steps:
-        (state, _), truncated, terminal = env.reset(), False, False             # Initialize/Reset Enviornment
-
-        while not terminal and not truncated:
+        (state, _) = env.reset()
+        truncated, terminal, done = False, False, False         # Initialize/Reset Enviornment
+        
+        while not done:
             with torch.no_grad():
-                mean, log_std = actor.forward(torch.from_numpy(state).float())  # type: ignore # select Action a for State s w/ Actor model
-            (action, _) = sample(mean, log_std, False)                          # take action in the enviornment
+                mean, log_std = actor.forward(torch.from_numpy(state).float())      # type: ignore # select Action a for State s w/ Actor model
+            (action, _) = sample(mean, log_std, False)                              # take action in the enviornment
 
             newState, reward, terminal, truncated, info = env.step(action.detach().numpy())
             step += 1
@@ -92,7 +96,7 @@ def learn(steps=1000000, lr=3e-4, reward_scale=20, temperature=0.2, batchSize=25
             if step % 10000 == 0:
                 avg_rewards, avg_duration = evaluate(env, actor)
                 rewards = np.append(rewards, avg_rewards)
-                print(f"episode: {step}; AVG Reward: {rewards[-1]:.3f}, AVG Duration: {avg_duration:.3f}")
+                print(f"episode: {step//1000}k; AVG Reward: {rewards[-1]:.3f}, AVG Duration: {int(avg_duration)}")
             
             if saveable(step):
                 save(
@@ -137,6 +141,13 @@ def learn(steps=1000000, lr=3e-4, reward_scale=20, temperature=0.2, batchSize=25
                     optimAct.zero_grad(set_to_none=True)
                     actor_loss.backward()
                     optimAct.step()
+                    
+                    # update temperature
+                    temp_loss = -(log_temp * (logP + entropy_target)).mean()
+                    optimTemp.zero_grad()
+                    temp_loss.backward()
+                    optimTemp.step()
+                    temperature = log_temp.exp()
                     
                     # unfreeze critics
                     for p in itertools.chain(critic1.parameters(), critic2.parameters()):
