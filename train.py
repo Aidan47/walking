@@ -27,7 +27,7 @@ def sample(mean:torch.Tensor, log_std:torch.Tensor, with_entropy:bool, scale=0.4
     u = mean + std * epsilon
     tanh_u = torch.tanh(u)
     a = scale * tanh_u
-    logP = 0
+    logP = torch.zeros(1)
     if with_entropy:
         logP_u = -0.5 * ((epsilon**2) + 2*log_std + np.log(2*np.pi))
         logP_u = logP_u.sum(dim=-1, keepdim=True)
@@ -106,14 +106,14 @@ def learn(steps=1000000, lr=3e-4, entropy_target=-17, batchSize=256, numOfUpdate
                     critic2=critic2,
                     target2=target2
                 )
-                np.save("rewards", rewards, True)
+                np.save("checkpoints/rewards", rewards, True)
             
             if updatable(buffer.ptr):
                 # randomly sample buffer
                 batch = buffer.sample(batchSize)
                 
                 for _ in range(numOfUpdates):
-                    states, actions, rewards, newStates, done = batch     # transpose batch to unpack values
+                    states, actions, rewards, newStates, dones = batch     # transpose batch to unpack values
 
                     # compute targets for Q functions
                     with torch.no_grad():
@@ -121,7 +121,7 @@ def learn(steps=1000000, lr=3e-4, entropy_target=-17, batchSize=256, numOfUpdate
                         newActs, logP = sample(mean, log_std, True)
                         q1, q2 = target1.forward(newStates, newActs), target2.forward(newStates, newActs)
                         q = torch.min(q1, q2) - temperature * logP
-                        y = rewards + discount * (1.0 - done.float()) * q
+                        y = rewards + discount * (1.0 - dones.float()) * q
 
                     # update q functions (gradient descent)
                     critic_loss = 0.5 * (F.mse_loss(critic1.forward(states, actions), y) + F.mse_loss(critic2.forward(states, actions), y))
@@ -143,8 +143,8 @@ def learn(steps=1000000, lr=3e-4, entropy_target=-17, batchSize=256, numOfUpdate
                     optimAct.step()
                     
                     # update temperature
-                    temp_loss = -(log_temp * (logP + entropy_target)).mean()
-                    optimTemp.zero_grad()
+                    temp_loss = -(log_temp * (logP.detach() + entropy_target)).mean()
+                    optimTemp.zero_grad(set_to_none=True)
                     temp_loss.backward()
                     optimTemp.step()
                     temperature = log_temp.exp()
