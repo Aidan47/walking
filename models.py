@@ -39,4 +39,4 @@ class Critic(nn.Module):
     
 def save(**kwargs):
     for key, value in kwargs.items():
-        torch.save(value.state_dict, f"checkpoints/{key}.pth")    # save each model
+        torch.save(value.state_dict(), f"checkpoints/{key}.pth")    # save each model
