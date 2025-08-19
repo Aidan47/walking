@@ -11,15 +11,15 @@ import itertools
 
 
 
-def Initialize(lr):
-    env = gym.make("Humanoid-v4")
+def Initialize(Env, lr):
+    env = gym.make(Env)
     sDim, aDim = env.observation_space.shape[0], env.action_space.shape[0] # type: ignore
     a, c1, c2 = Actor(sDim, aDim), Critic(sDim+aDim), Critic(sDim+aDim),
     optimAct = torch.optim.Adam(a.parameters(), lr=lr)
     optimQ = torch.optim.Adam(list(c1.parameters()) + list(c2.parameters()), lr=lr)
     log_temp = torch.zeros(1, requires_grad=True)
     optimTemp = torch.optim.Adam([log_temp], lr=lr)
-    return a, c1, c2, log_temp, optimAct, optimQ, optimTemp, Buffer(sDim, aDim, size=1000000), env # type: ignore
+    return a, c1, c2, log_temp, optimAct, optimQ, optimTemp, Buffer(sDim=sDim, aDim=aDim, size=1000000), env # type: ignore
     
 
 def sample(mean:torch.Tensor, log_std:torch.Tensor, with_entropy:bool, scale=0.4):
@@ -71,8 +71,8 @@ def evaluate(env, actor, episodes=10):
     return AVG_reward, AVG_duration
 
 
-def learn(steps=1000000, lr=3e-4, entropy_target=-17, batchSize=256, numOfUpdates=1, target_smoothing=0.005, discount=0.99):
-    actor, critic1, critic2, log_temp, optimAct, optimQ, optimTemp, buffer, env = Initialize(lr)
+def learn(Env="humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSize=256, numOfUpdates=1, target_smoothing=0.005, discount=0.99):
+    actor, critic1, critic2, log_temp, optimAct, optimQ, optimTemp, buffer, env = Initialize(Env, lr)
     target1, target2 = deepcopy(critic1), deepcopy(critic2)     # target networks
     temperature = log_temp.exp()
     rewards = np.ndarray([])
@@ -101,13 +101,15 @@ def learn(steps=1000000, lr=3e-4, entropy_target=-17, batchSize=256, numOfUpdate
             
             if saveable(step):
                 save(
+                    env=Env
+                    step=step//1000
                     actor=actor,
                     critic1=critic1,
                     target1=target1,
                     critic2=critic2,
                     target2=target2
                 )
-                np.save("checkpoints/rewards", rewards, True)
+                np.save(f"checkpoints/{Env}/rewards_{step//1000}k", rewards, True)
             
             if updatable(buffer.ptr):
                 # randomly sample buffer
@@ -160,6 +162,7 @@ def learn(steps=1000000, lr=3e-4, entropy_target=-17, batchSize=256, numOfUpdate
             
     # Save trained models
     save(
+        env=Env
         actor=actor,
         critic1=critic1,
         target1=target1,
@@ -168,7 +171,7 @@ def learn(steps=1000000, lr=3e-4, entropy_target=-17, batchSize=256, numOfUpdate
     )
     
     # Save rewards
-    np.save("checkpoints/rewards.npy", rewards, True)
+    np.save(f"checkpoints/{Env}/rewards.npy", rewards, True)
 
 
 if __name__ == "__main__":
