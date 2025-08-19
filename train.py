@@ -38,7 +38,7 @@ def sample(mean:torch.Tensor, log_std:torch.Tensor, with_entropy:bool, scale=0.4
     return a, logP
 
 
-def saveable(step, save=50000):
+def saveable(step, save=100000):
     return step % save == 0
 
 
@@ -71,7 +71,7 @@ def evaluate(env, actor, episodes=10):
     return AVG_reward, AVG_duration
 
 
-def learn(Env="humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSize=256, numOfUpdates=1, target_smoothing=0.005, discount=0.99):
+def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSize=256, numOfUpdates=1, target_smoothing=0.005, discount=0.99):
     actor, critic1, critic2, log_temp, optimAct, optimQ, optimTemp, buffer, env = Initialize(Env, lr)
     target1, target2 = deepcopy(critic1), deepcopy(critic2)     # target networks
     temperature = log_temp.exp()
@@ -101,8 +101,8 @@ def learn(Env="humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSi
             
             if saveable(step):
                 save(
-                    env=Env
-                    step=step//1000
+                    env=Env,
+                    step=step//1000,
                     actor=actor,
                     critic1=critic1,
                     target1=target1,
@@ -162,7 +162,7 @@ def learn(Env="humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSi
             
     # Save trained models
     save(
-        env=Env
+        env=Env,
         actor=actor,
         critic1=critic1,
         target1=target1,
