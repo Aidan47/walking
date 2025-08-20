@@ -61,9 +61,8 @@ def save(**kwargs):
     step = kwargs.pop("step", None)
     
     # save each model
-    if step != None:
-        for key, value in kwargs.items():
+    for key, value in kwargs.items():
+        if key == "actor" and step is not None:
             torch.save(value.state_dict(), f"checkpoints/{env}/{key}_{step}k.pth")
-    else:
-        for key, value in kwargs.items():
+        else:
             torch.save(value.state_dict(), f"checkpoints/{env}/{key}.pth")
