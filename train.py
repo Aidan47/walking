@@ -118,8 +118,10 @@ def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSi
                     critic2=critic2,
                     target2=target2
                 )
-                np.save(f"checkpoints/{Env}/rewards_{step//1000}k", Avg_Rewards, True)
-                np.save(f"checkpoints/{Env}/norm_{step//1000}k", np.array([norm.mean, norm.var, norm.epsilon]), True)
+                np.save(f"checkpoints/{Env}/rewards", Avg_Rewards, True)
+                torch.save({"mean": norm.mean,
+                        "var": norm.var,
+                        "epsilon": norm.epsilon}, f"checkpoints/{Env}/norm.pth")
             
             if updatable(buffer.ptr):
                 # randomly sample buffer
@@ -180,10 +182,6 @@ def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSi
         critic2=critic2,
         target2=target2
     )
-    
-    # Save rewards & norm
-    np.save(f"checkpoints/{Env}/rewards.npy", Avg_Rewards, True)
-    np.save(f"checkpoints/{Env}/norm_{step//1000}k", np.array([norm.mean, norm.var, norm.epsilon]), True)
 
 
 if __name__ == "__main__":
