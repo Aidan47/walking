@@ -6,6 +6,7 @@ import gymnasium as gym
 import numpy as np
 from models import Actor, Critic, save
 from buffer import Buffer
+from normalizer import StateNormalizer
 from copy import deepcopy
 import itertools
 
@@ -19,7 +20,7 @@ def Initialize(Env, lr):
     optimQ = torch.optim.Adam(list(c1.parameters()) + list(c2.parameters()), lr=lr)
     log_temp = torch.zeros(1, requires_grad=True)
     optimTemp = torch.optim.Adam([log_temp], lr=lr)
-    return a, c1, c2, log_temp, optimAct, optimQ, optimTemp, Buffer(sDim=sDim, aDim=aDim, size=1000000), env # type: ignore
+    return a, c1, c2, log_temp, optimAct, optimQ, optimTemp, Buffer(sDim=sDim, aDim=aDim, size=1000000), StateNormalizer(sDim), env # type: ignore
     
 
 def sample(mean:torch.Tensor, log_std:torch.Tensor, with_entropy:bool, scale=0.4):
@@ -56,15 +57,17 @@ def soft_update(Q, T, p):
 
 
 @torch.no_grad()
-def evaluate(env, actor, episodes=10):
+def evaluate(env, norm, actor, episodes=10):
     total_rewards = []
     total_durations = []
     for episode in range(episodes):
         (state, _), truncated, terminal = env.reset(), False, False
         rewards = steps = 0
         while not (terminal or truncated):
+            state = norm.prep(state)
+            
             with torch.no_grad():
-                action, _ = actor.forward(torch.from_numpy(state).float())
+                action, _ = actor.forward(state)
             newState, reward, terminal, truncated, _ = env.step(action.detach().numpy())
             state = newState
             rewards += reward
@@ -75,7 +78,7 @@ def evaluate(env, actor, episodes=10):
 
 
 def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSize=256, numOfUpdates=1, target_smoothing=0.005, discount=0.99):
-    actor, critic1, critic2, log_temp, optimAct, optimQ, optimTemp, buffer, env = Initialize(Env, lr)
+    actor, critic1, critic2, log_temp, optimAct, optimQ, optimTemp, buffer, norm, env = Initialize(Env, lr)
     target1, target2 = deepcopy(critic1), deepcopy(critic2)     # target networks
     temperature = log_temp.exp()
     Avg_Rewards = list()
@@ -83,23 +86,25 @@ def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSi
     step = 0
     while step < steps:
         (state, _) = env.reset()
-        truncated, terminal, done = False, False, False         # Initialize/Reset Enviornment
+        terminal, truncated = False, False         # Initialize/Reset Enviornment
         
-        while not done:
+        while not (truncated or terminal):
+            state = norm.prep(state)
+            
             with torch.no_grad():
-                mean, log_std = actor.forward(torch.from_numpy(state).float())      # type: ignore # select Action a for State s w/ Actor model
+                mean, log_std = actor.forward(state)      # type: ignore # select Action a for State s w/ Actor model
             (action, _) = sample(mean, log_std, False)                              # take action in the enviornment
 
-            newState, reward, terminal, truncated, info = env.step(action.detach().numpy())
-            done = terminal or truncated
-            buffer.add(torch.from_numpy(state).detach(), action.detach(), reward, torch.from_numpy(newState).detach(), terminal) # store replay in buffer
-            state = newState
-
+            newState, reward, terminal, truncated, _ = env.step(action.detach().numpy())
+            buffer.add(state.detach(), action.detach(), reward, torch.from_numpy(newState).detach(), terminal) # store replay in buffer
+            norm.update(state) # update state normalizer
             step += 1  # 1 enviornment step
+            
+            state = newState
             
             # measure progress
             if step % 10000 == 0:
-                avg_reward, avg_duration = evaluate(env, actor)
+                avg_reward, avg_duration = evaluate(env, norm, actor)
                 Avg_Rewards.append(avg_reward)
                 print(f"episode: {step//1000}k; AVG Reward: {Avg_Rewards[-1]:.3f}, AVG Duration: {int(avg_duration)}")
             
@@ -121,7 +126,8 @@ def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSi
                 
                 for _ in range(numOfUpdates):
                     states, actions, rewards, newStates, dones = batch     # transpose batch to unpack values
-
+                    states, newStates = norm.prep(states), norm.prep(newStates)
+                    
                     # compute targets for Q functions
                     with torch.no_grad():
                         mean, log_std = actor.forward(newStates)
