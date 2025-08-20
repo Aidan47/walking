@@ -15,8 +15,8 @@ class Actor(nn.Module):
         self.log_std = nn.Linear(256, output, dtype=torch.float32)
     
     def forward(self, s:torch.Tensor):
-        x = F.relu(self.l1(s))
-        x = F.relu(self.l2(x))
+        x = F.silu(self.l1(s))
+        x = F.silu(self.l2(x))
         mu = self.mu(x)
         log_std = torch.clamp(self.log_std(x), -5, 2)
         return mu, log_std
@@ -32,8 +32,8 @@ class Critic(nn.Module):
         
     def forward(self, s:torch.Tensor, a:torch.Tensor):
         x = torch.cat([s, a], dim=-1)
-        x = F.relu(self.l1(x))
-        x = F.relu(self.l2(x))
+        x = F.silu(self.l1(x))
+        x = F.silu(self.l2(x))
         return self.l3(x)
     
     
