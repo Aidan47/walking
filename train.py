@@ -92,7 +92,7 @@ def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSi
 
             newState, reward, terminal, truncated, info = env.step(action.detach().numpy())
             done = terminal or truncated
-            buffer.add(torch.from_numpy(state).detach(), action.detach(), reward, torch.from_numpy(newState).detach(), done) # store replay in buffer
+            buffer.add(torch.from_numpy(state).detach(), action.detach(), reward, torch.from_numpy(newState).detach(), terminal) # store replay in buffer
             state = newState
 
             step += 1  # 1 enviornment step
