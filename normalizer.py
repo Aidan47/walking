@@ -21,7 +21,7 @@ class StateNormalizer:
         return torch.clip(s, min, max)
     
     def prep(self, s):
-        if type(s) is not torch.tensor:
+        if type(s) is not torch.Tensor:
             s = torch.from_numpy(s).float()
         s = self.normalize(s)
         return self.clip(s, -5, 5)
