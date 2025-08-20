@@ -1,11 +1,11 @@
-import torch
+import numpy as np
 
 
 class StateNormalizer:
     def __init__(self, state_dim, epsilon=1e-8):
         self.count = 0
-        self.mean = torch.zeros(state_dim, dtype=torch.float32, requires_grad=False)
-        self.var  = torch.ones(state_dim, dtype=torch.float32, requires_grad=False)
+        self.mean = np.zeros(state_dim, dtype=np.float32)
+        self.var  = np.ones(state_dim, dtype=np.float32)
         self.epsilon = epsilon
         
     def update(self, s):    # only for individual states
@@ -15,7 +15,7 @@ class StateNormalizer:
         self.var += delta * (s - self.mean) / self.count
     
     def normalize(self, s):
-        return (s - self.mean) / (torch.sqrt(self.var) + self.epsilon)
+        return (s - self.mean) / (np.sqrt(self.var) + self.epsilon)
     
     def clip(self, s, min, max):
-        return torch.clamp(s, min, max)
+        return np.clip(s, min, max)
