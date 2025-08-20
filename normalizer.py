@@ -19,3 +19,7 @@ class StateNormalizer:
     
     def clip(self, s, min, max):
         return np.clip(s, min, max)
+    
+    def prep(self, s):
+        s = self.normalize(s)
+        return self.clip(s, -5, 5)
