@@ -22,7 +22,7 @@ class Buffer:
         self.A[i] = a
         self.R[i, 0] = r
         self.S2[i] = s2
-        self.done[i, 0] = d
+        self.done[i, 0] = 1 - d     # if terminal is true: done = 0
         self.ptr = (i + 1) % self.size
         if self.ptr == 0:
             self.full = True
