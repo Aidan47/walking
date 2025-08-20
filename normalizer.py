@@ -7,8 +7,14 @@ class StateNormalizer:
         self.mean = torch.zeros(state_dim, dtype=torch.float32, requires_grad=False)
         self.var  = torch.ones(state_dim, dtype=torch.float32, requires_grad=False)
         self.epsilon = epsilon
-        
+
+    def type(self, s):
+        if type(s) is not torch.Tensor:
+            s = torch.from_numpy(s).float()
+        return s
+    
     def update(self, s):    # only for individual states
+        s = self.type(s)
         self.count += 1
         delta = s - self.mean
         self.mean += delta / self.count
@@ -18,10 +24,9 @@ class StateNormalizer:
         return (s - self.mean) / (torch.sqrt(self.var) + self.epsilon)
     
     def clip(self, s, min, max):
-        return torch.clip(s, min, max)
+        return torch.clamp(s, min, max)
     
     def prep(self, s):
-        if type(s) is not torch.Tensor:
-            s = torch.from_numpy(s).float()
+        s = self.type(s)
         s = self.normalize(s)
         return self.clip(s, -5, 5)

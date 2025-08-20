@@ -89,14 +89,14 @@ def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSi
         terminal, truncated = False, False         # Initialize/Reset Enviornment
         
         while not (truncated or terminal):
-            state = norm.prep(state)
+            norm_state = norm.prep(state)
             
             with torch.no_grad():
-                mean, log_std = actor.forward(state)      # type: ignore # select Action a for State s w/ Actor model
+                mean, log_std = actor.forward(norm_state)      # type: ignore # select Action a for State s w/ Actor model
             (action, _) = sample(mean, log_std, False)                              # take action in the enviornment
 
             newState, reward, terminal, truncated, _ = env.step(action.detach().numpy())
-            buffer.add(state.detach(), action.detach(), reward, torch.from_numpy(newState).detach(), terminal) # store replay in buffer
+            buffer.add(torch.from_numpy(state).detach(), action.detach(), reward, torch.from_numpy(newState).detach(), terminal) # store replay in buffer
             norm.update(state) # update state normalizer
             step += 1  # 1 enviornment step
             
@@ -106,7 +106,7 @@ def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSi
             if step % 10000 == 0:
                 avg_reward, avg_duration = evaluate(env, norm, actor)
                 Avg_Rewards.append(avg_reward)
-                print(f"episode: {step//1000}k; AVG Reward: {Avg_Rewards[-1]:.3f}, AVG Duration: {int(avg_duration)}")
+                print(f"episode: {step//1000}k; AVG Reward: {Avg_Rewards[-1]:.0f}, AVG Duration: {int(avg_duration)}")
             
             if saveable(step):
                 save(
