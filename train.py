@@ -9,6 +9,7 @@ from buffer import Buffer
 from normalizer import StateNormalizer
 from copy import deepcopy
 import itertools
+import pickle
 
 
 
@@ -119,9 +120,8 @@ def learn(Env="Humanoid-v5", steps=1000000, lr=3e-4, entropy_target=-17, batchSi
                     target2=target2
                 )
                 np.save(f"checkpoints/{Env}/rewards", Avg_Rewards, True)
-                torch.save({"mean": norm.mean,
-                        "var": norm.var,
-                        "epsilon": norm.epsilon}, f"checkpoints/{Env}/norm.pth")
+                with open(f"checkpoints/{Env}/norm.pkl", "wb") as f:
+                    pickle.dump(norm, f)
             
             if updatable(buffer.ptr):
                 # randomly sample buffer
